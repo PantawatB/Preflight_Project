@@ -125,7 +125,7 @@ const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
 app.use(jsonErrorHandler);
 
 // Running app
-const PORT = process.env.PORT || 3093;
+const PORT = process.env.PORT || 3092;
 // * Running app
 app.listen(PORT, async () => {
   debug(`Listening on port ${PORT}: http://localhost:${PORT}`);
@@ -212,4 +212,3 @@ app.post("/todo/owner/all", async (req, res, next) => {
     next(err);
   }
 });
-
