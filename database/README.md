@@ -152,5 +152,5 @@ These issues stem from the intersection of evolving JavaScript module standards,
 [^36]: https://github.com/npm/feedback/discussions/115
 [^37]: https://github.com/npm/cli/issues/5332
 [^38]: https://stackoverflow.com/questions/50998089/running-npm-script-on-windows-starting-with-a-period/52954967
-[^39]: https://www.ctyun.cn/developer/article/496309334851653
+[^39]: https://www.ctyun.cn/developer/article/496309234851653
 [^40]: https://www.kali.org/tools/powershell/

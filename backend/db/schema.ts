@@ -28,3 +28,4 @@ export const ownerTable = pgTable("owner", {
     () => new Date()
   ),
 });
+

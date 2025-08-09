@@ -137,23 +137,14 @@ const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
 app.use(jsonErrorHandler);
 
 // Running app
-const PORT = process.env.PORT || 3087;
+const PORT = process.env.PORT || 3092;
 // * Running app
 app.listen(PORT, async () => {
   debug(`Listening on port ${PORT}: http://localhost:${PORT}`);
 });
 
-app.get("/todo/owner", (req, res) => {
-  const data = [
-    {
-      id: "650612087",
-      name: "Nithipong Howong",
-      course_id: "269497",
-      section: "803",
-    },
-  ];
-  res.json(data);
-});
+////////////////////////////////////////////////
+// ========== OWNER ROUTES ==========
 
 // GET all owner data
 app.get("/todo/owner", async (req, res, next) => {

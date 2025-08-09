@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { get } from '../services/web.service.ts';
+import { get, deleteTodo, addTodo, updateTodo } from '../services/web.service.ts';
 import type { TodoItem } from '../models/web.model.ts'
 
 const apiResult = ref<TodoItem[] | null>(null);
@@ -9,6 +9,47 @@ const error = ref<string | null>(null);
 // สำหรับ modal ลบ
 const showDeleteModal = ref(false);
 const deleteTargetId = ref<string | null>(null);
+
+// สำหรับ modal create/edit
+const showModal = ref(false);
+const isEditing = ref(false);
+const formData = ref({
+  todoText: '',
+});
+const editTodoId = ref<string | null>(null);
+
+function openCreateModal() {
+  isEditing.value = false;
+  formData.value = { todoText: '' };
+  editTodoId.value = null;
+  showModal.value = true;
+}
+
+function openEditModal(todo: TodoItem) {
+  isEditing.value = true;
+  formData.value = { todoText: todo.todoText };
+  editTodoId.value = todo.id;
+  showModal.value = true;
+}
+
+function closeModal() {
+  showModal.value = false;
+}
+
+async function handleSubmit() {
+  try {
+    if (isEditing.value && editTodoId.value) {
+      await updateTodo(editTodoId.value, formData.value.todoText);
+    } else {
+      await addTodo(formData.value.todoText);
+    }
+    showModal.value = false;
+    editTodoId.value = null;
+    await fetchApi();
+  } catch (e: any) {
+    error.value = e.message || 'Error';
+  }
+}
 
 async function fetchApi() {
   error.value = null;
@@ -33,9 +74,8 @@ function cancelDelete() {
 
 async function confirmDelete() {
   if (!deleteTargetId.value) return;
-  // เรียก API ลบ (สมมติว่ามีฟังก์ชัน deleteTodo)
   try {
-    await get(`/todo/delete/${deleteTargetId.value}`); // เปลี่ยนเป็น deleteTodo จริงในภายหลัง
+    await deleteTodo(deleteTargetId.value);
     showDeleteModal.value = false;
     deleteTargetId.value = null;
     await fetchApi();
@@ -96,7 +136,7 @@ async function confirmDelete() {
         
         <button
           class="flex items-center gap-2 bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-800"
-          
+          @click="openCreateModal"
         >
           <span class="font-semibold">+ Add</span>
         </button>
@@ -215,6 +255,7 @@ async function confirmDelete() {
                 <!-- Edit Button -->
                 <button
                   class="flex items-center gap-1 bg-slate-600 border text-white px-3 py-2 rounded-lg hover:bg-slate-800"
+                  @click="openEditModal(todo)"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -226,6 +267,115 @@ async function confirmDelete() {
                   </svg>
                   <span>Edit</span>
                 </button>
+                <!-- Modal -->
+    <div
+      v-if="showModal"
+      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center"
+    >
+      <div class="relative bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+        <h2 class="text-xl font-bold mb-6">{{ isEditing ? 'Edit member' : 'Add new member' }}</h2>
+        <form >
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                
+                required
+                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select
+                
+                required
+                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+              >
+                <option value="">Select Role</option>
+                
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                
+                required
+                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">School</label>
+              <select
+                
+                required
+                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+              >
+                <option value="">Select School</option>
+                
+              </select>
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              @click="closeModal"
+              class="px-4 py-2 border rounded-lg hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-800"
+            >
+              {{ isEditing ? 'Update' : 'Add' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+                <!-- Create/Edit Modal Popup -->
+                <div
+                  v-if="showModal"
+                  class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center"
+                >
+                  <div class="relative bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-6">{{ isEditing ? 'Edit todo' : 'Add new todo' }}</h2>
+                    <form @submit.prevent="handleSubmit">
+                      <div class="space-y-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 mb-1">Todo</label>
+                          <input
+                            type="text"
+                            v-model="formData.todoText"
+                            required
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="Enter todo"
+                          />
+                        </div>
+                      </div>
+                      <div class="mt-6 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          @click="closeModal"
+                          class="px-4 py-2 border rounded-lg hover:bg-gray-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          :class="isEditing ? 'px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-800' : 'px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-800'"
+                        >
+                        
+                          {{ isEditing ? 'Update' : 'Create' }}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
                 <!-- Delete Button -->
                 <button
                   class="flex items-center gap-1 bg-red-600 border text-white px-3 py-2 rounded-lg hover:bg-red-800"
