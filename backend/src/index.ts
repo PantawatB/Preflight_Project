@@ -40,14 +40,18 @@ app.get("/todo", async (req, res, next) => {
 // Insert
 app.put("/todo", async (req, res, next) => {
   try {
-    const todoText = req.body.todoText ?? "";
-    if (!todoText) throw new Error("Empty todoText");
+    const { title, profile_url, status } = req.body;
+    if (!title) throw new Error("Empty title");
+
     const result = await dbClient
       .insert(todoTable)
       .values({
-        todoText,
+        title,
+        profile_url: profile_url ?? null,
+        status: status ?? "pending",
       })
-      .returning({ id: todoTable.id, todoText: todoTable.todoText });
+      .returning();
+
     res.json({ msg: `Insert successfully`, data: result[0] });
   } catch (err) {
     next(err);
@@ -57,11 +61,18 @@ app.put("/todo", async (req, res, next) => {
 // Update
 app.patch("/todo", async (req, res, next) => {
   try {
-    const id = req.body.id ?? "";
-    const todoText = req.body.todoText ?? "";
-    if (!todoText || !id) throw new Error("Empty todoText or id");
+    const { id, title, profile_url, status } = req.body;
+    if (!id) throw new Error("Empty id");
 
-    // Check for existence if data
+    const updateData: Record<string, any> = {};
+    if (title !== undefined) updateData.title = title;
+    if (profile_url !== undefined) updateData.profile_url = profile_url;
+    if (status !== undefined) updateData.status = status;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new Error("No fields to update");
+    }
+
     const results = await dbClient.query.todoTable.findMany({
       where: eq(todoTable.id, id),
     });
@@ -69,10 +80,11 @@ app.patch("/todo", async (req, res, next) => {
 
     const result = await dbClient
       .update(todoTable)
-      .set({ todoText })
+      .set(updateData)
       .where(eq(todoTable.id, id))
-      .returning({ id: todoTable.id, todoText: todoTable.todoText });
-    res.json({ msg: `Update successfully`, data: result });
+      .returning();
+
+    res.json({ msg: `Update successfully`, data: result[0] });
   } catch (err) {
     next(err);
   }
