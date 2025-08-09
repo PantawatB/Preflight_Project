@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import Todolist from './components/Todolist.vue'
 </script>
 
 <template>
 
-  <HelloWorld/>
+ 
+  <RouterView />
+  
 </template>
 
 <style scoped>
