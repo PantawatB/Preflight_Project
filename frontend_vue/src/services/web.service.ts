@@ -1,11 +1,14 @@
 // ฟังก์ชันแก้ไข todo แบบ PATCH (ตามตัวอย่าง React)
-export async function updateTodo(id: string, todoText: string) {
+// ฟังก์ชันแก้ไข todo แบบ PATCH (รองรับอัปเดต isDone ด้วย)
+export async function updateTodo(id: string, todoText: string, isDone?: boolean) {
+  const body: any = { id, todoText };
+  if (typeof isDone === 'boolean') body.isDone = isDone;
   const res = await fetch(`${API_BASE_URL}/todo`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ id, todoText }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error('API error');
   return res.json();

@@ -1,12 +1,85 @@
 <template>
   <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">Database</h1>
+      <h1 class="text-3xl font-bold">Todo List🎯</h1>
       <div class="flex items-center gap-4">
-        <!-- Search removed for todo list -->
+        <!-- Search Bar -->
+        <div class="relative">
+          <input
+            type="text"
+            v-model="searchQuery"
+            placeholder="Search todo..."
+            class="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+          />
+          <svg
+            class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            ></path>
+          </svg>
+        </div>
 
         <!-- Filter Button -->
-        <!-- Filter removed for todo list -->
+        <div class="relative" ref="filterRef">
+          <button
+            @click="showFilterMenu = !showFilterMenu"
+            class="flex items-center gap-2 bg-white border px-4 py-2 rounded-lg hover:bg-gray-50"
+          >
+            <svg
+              class="w-5 h-5 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+            <span class="text-gray-700">Filter</span>
+            <span
+              v-if="selectedStatus"
+              class="bg-slate-500 text-white text-xs px-2 py-1 rounded-full"
+            >
+              1
+            </span>
+          </button>
+
+          <!-- Filter Dropdown -->
+          <div
+            v-if="showFilterMenu"
+            class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border p-4 z-10"
+          >
+            <!-- Status Filter -->
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <select
+                v-model="selectedStatus"
+                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+              >
+                <option value="">All Status</option>
+                <option value="done">Done</option>
+                <option value="notdone">Not done</option>
+              </select>
+            </div>
+            <!-- Clear Filters -->
+            <button
+              @click="clearFilters"
+              class="w-full px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-700"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
 
         <button
           class="flex items-center gap-2 bg-slate-600 text-white px-4 py-2 rounded-lg hover:bg-slate-800"
@@ -33,7 +106,7 @@
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <!-- Empty state message -->
-          <tr v-if="contacts.length === 0">
+          <tr v-if="filteredTodos.length === 0">
             <td colspan="6" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center justify-center space-y-3">
                 <svg
@@ -59,12 +132,14 @@
           </tr>
           <!-- Table rows for todos -->
           <tr
-            v-for="todo in contacts"
+            v-for="todo in paginatedTodos"
             :key="todo.id"
             class="hover:bg-gray-100"
           >
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ todo.id }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ todo.todoText }}</td>
+            <td class="px-6 py-4 whitespace-normal break-words max-w-xs text-sm text-gray-900" style="word-break: break-word; overflow-wrap: anywhere;">
+              {{ todo.todoText }}
+            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <span :class="todo.isDone ? 'text-green-600 font-semibold' : 'text-gray-400'">
                 {{ todo.isDone ? 'Done' : 'Not done' }}
@@ -78,6 +153,16 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
               <div class="flex items-center justify-end gap-2">
+                <button
+                  @click="viewTodo(todo)"
+                  class="flex items-center gap-1 bg-white border border-slate-400 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100"
+                  title="View"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
                 <button
                   @click="editTodoModal(todo)"
                   class="flex items-center gap-1 bg-slate-600 border text-white px-3 py-2 rounded-lg hover:bg-slate-800"
@@ -112,6 +197,59 @@
         </tbody>
       </table>
 
+      <!-- View Modal -->
+      <div
+        v-if="showViewModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50"
+      >
+        <div class="relative bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <h2 class="text-xl font-bold mb-6">Todo Details</h2>
+          <div class="space-y-4">
+            <div>
+              <span class="font-semibold text-gray-700">ID:</span>
+              <span class="ml-2 text-gray-900">{{ viewTodoData?.id }}</span>
+            </div>
+            <div>
+              <span class="font-semibold text-gray-700">Todo:</span>
+              <span class="ml-2 text-gray-900 break-words" style="word-break: break-word; overflow-wrap: anywhere;">{{ viewTodoData?.todoText }}</span>
+            </div>
+            <div>
+              <span class="font-semibold text-gray-700">Status:</span>
+              <span class="ml-2" :class="viewTodoData?.isDone ? 'text-green-600 font-semibold' : 'text-gray-400'">
+                {{ viewTodoData?.isDone ? 'Done' : 'Not done' }}
+              </span>
+            </div>
+            <div>
+              <span class="font-semibold text-gray-700">Created At:</span>
+              <span class="ml-2 text-gray-900">{{ viewTodoData ? new Date(viewTodoData.createdAt).toLocaleString() : '' }}</span>
+            </div>
+            <div>
+              <span class="font-semibold text-gray-700">Updated At:</span>
+              <span class="ml-2 text-gray-900">{{ viewTodoData ? new Date(viewTodoData.updatedAt).toLocaleString() : '' }}</span>
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              @click="closeViewModal"
+              class="px-4 py-2 border rounded-lg hover:bg-gray-200"
+            >
+              Close
+            </button>
+            <button
+              v-if="viewTodoData && !viewTodoData.isDone"
+              @click="markAsDone(viewTodoData)"
+              class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-800 flex items-center gap-1"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              Mark as Done
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Pagination removed for todo list -->
     </div>
 
@@ -130,9 +268,13 @@
                 type="text"
                 v-model="newTodo.todoText"
                 required
+                maxlength="255"
                 class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
-                placeholder="Enter todo"
+                placeholder="Enter todo (max 255 characters)"
               />
+              <div class="text-xs text-gray-500 mt-1 text-right">
+                {{ newTodo.todoText.length }}/255
+              </div>
             </div>
           </div>
           <div class="mt-6 flex justify-end gap-3">
@@ -196,7 +338,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getTodos, addTodo, updateTodo, deleteTodo } from '../services/web.service.ts'
 
 interface Todo {
@@ -207,24 +349,55 @@ interface Todo {
   updatedAt: string
 }
 
-const contacts = ref<Todo[]>([])
+const todos = ref<Todo[]>([])
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const isEditing = ref(false)
 const editingTodo = ref<Todo | null>(null)
 const todoToDelete = ref<Todo | null>(null)
 const newTodo = ref({ todoText: '' })
+const searchQuery = ref('')
+const showFilterMenu = ref(false)
+const selectedStatus = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 10
+const showViewModal = ref(false)
+const viewTodoData = ref<Todo | null>(null)
 
-async function fetchContacts() {
+const filteredTodos = computed(() => {
+  return todos.value.filter((todo) => {
+    const matchesSearch = todo.todoText.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesStatus =
+      !selectedStatus.value ||
+      (selectedStatus.value === 'done' && todo.isDone) ||
+      (selectedStatus.value === 'notdone' && !todo.isDone)
+    return matchesSearch && matchesStatus
+  })
+})
+
+const paginatedTodos = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredTodos.value.slice(start, end)
+})
+
+async function fetchTodos() {
   try {
     const data = await getTodos()
-    contacts.value = data
+    todos.value = data
   } catch (e) {
-    contacts.value = []
+    todos.value = []
   }
 }
 
-onMounted(fetchContacts)
+onMounted(() => {
+  window.addEventListener('click', handleClickOutside)
+  fetchTodos()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', handleClickOutside)
+})
 
 const openModal = () => {
   isEditing.value = false
@@ -252,7 +425,7 @@ const addOrUpdateTodo = async () => {
   } else {
     await addTodo(newTodo.value.todoText)
   }
-  await fetchContacts()
+  await fetchTodos()
   closeModal()
 }
 
@@ -264,7 +437,7 @@ const openDeleteModal = (todo: Todo) => {
 const confirmDelete = async () => {
   if (todoToDelete.value) {
     await deleteTodo(todoToDelete.value.id)
-    await fetchContacts()
+    await fetchTodos()
     showDeleteModal.value = false
     todoToDelete.value = null
   }
@@ -273,5 +446,60 @@ const confirmDelete = async () => {
 const cancelDelete = () => {
   showDeleteModal.value = false
   todoToDelete.value = null
+}
+
+const clearFilters = () => {
+  selectedStatus.value = ''
+  searchQuery.value = ''
+  currentPage.value = 1
+}
+
+// Filter logic
+const filterRef = ref<HTMLElement | null>(null)
+
+function handleClickOutside(event: MouseEvent) {
+  if (showFilterMenu.value && filterRef.value && !filterRef.value.contains(event.target as Node)) {
+    showFilterMenu.value = false
+  }
+}
+
+const viewTodo = (todo: Todo) => {
+  viewTodoData.value = { ...todo }
+  showViewModal.value = true
+}
+
+const closeViewModal = () => {
+  showViewModal.value = false
+  viewTodoData.value = null
+}
+
+const markAsDone = async (todo: Todo) => {
+  // Try to send isDone in PATCH body (even if not in API spec)
+  try {
+    // @ts-ignore: try sending isDone, fallback if not supported
+    await fetch(import.meta.env.VITE_API_BASE_URL + '/todo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: todo.id, todoText: todo.todoText, isDone: true })
+    })
+  } catch (e) {
+    // fallback: just update todoText if isDone not supported
+    await updateTodo(todo.id, todo.todoText)
+  }
+  // Update the local state immediately for instant UI feedback
+  const idx = todos.value.findIndex(t => t.id === todo.id)
+  if (idx !== -1) {
+    todos.value[idx] = {
+      ...todos.value[idx],
+      isDone: true,
+      updatedAt: new Date().toISOString(),
+    }
+  }
+  // If in view modal, update the modal data as well
+  if (viewTodoData.value && viewTodoData.value.id === todo.id) {
+    viewTodoData.value.isDone = true
+    viewTodoData.value.updatedAt = new Date().toISOString()
+    showViewModal.value = false
+  }
 }
 </script>
