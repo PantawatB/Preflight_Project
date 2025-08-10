@@ -2,7 +2,6 @@
 import "dotenv/config";
 import { dbClient } from "@db/client.js";
 import { todoTable } from "@db/schema.js";
-import { ownerTable } from "@db/schema.js";
 import cors from "cors";
 import Debug from "debug";
 import { eq, count, ilike, and } from "drizzle-orm"; // ใช้นับจำนวนข้อมูลทั้งหมดในตาราง ซึ่งเป็นสิ่งจำเป็นในการคำนวณจำนวนหน้าทั้งหมด (totalPages)
@@ -204,127 +203,7 @@ app.listen(PORT, async () => {
   debug(`Listening on port ${PORT}: http://localhost:${PORT}`);
 });
 
-////////////////////////////////////////////////
-// ========== OWNER ROUTES ==========
 
-// GET all owner data - เพิ่ม Pagination
-app.get(
-  "/todo/owner",
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const page = parseInt(req.query.page?.toString() || "1");
-      const limit = parseInt(req.query.limit?.toString() || "10");
-      const offset = (page - 1) * limit;
 
-      const totalItemsResult = await dbClient
-        .select({ count: count() })
-        .from(ownerTable);
-      const totalItems = totalItemsResult[0].count;
-      const results = await dbClient.query.ownerTable.findMany({
-        limit: limit,
-        offset: offset,
-      });
 
-      const totalPages = Math.ceil(totalItems / limit);
-      const prevLink =
-        page > 1 ? `/todo/owner?page=${page - 1}&limit=${limit}` : null;
 
-      const response = {
-        data: results,
-        pagination: {
-          currentPage: page,
-          pageSize: limit,
-          totalItems: totalItems,
-          totalPages: totalPages,
-          next: null,
-          prev: prevLink,
-        },
-      };
-
-      res.json(response);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// INSERT new owner
-app.put(
-  "/todo/owner",
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id, Name, course_id, section } = req.body;
-      if (!id || !Name || !course_id || !section)
-        throw new Error("Missing required fields");
-
-      const result = await dbClient
-        .insert(ownerTable)
-        .values({ id, Name, course_id, section })
-        .returning();
-
-      res.json({ msg: `Owner inserted successfully`, data: result[0] });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// UPDATE owner
-app.patch(
-  "/todo/owner",
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id, Name, course_id, section } = req.body;
-      if (!id) throw new Error("Missing id");
-
-      const results = await dbClient.query.ownerTable.findMany({
-        where: eq(ownerTable.id, id),
-      });
-      if (results.length === 0) throw new Error("Invalid owner id");
-
-      const result = await dbClient
-        .update(ownerTable)
-        .set({ Name, course_id, section })
-        .where(eq(ownerTable.id, id))
-        .returning();
-
-      res.json({ msg: `Owner updated successfully`, data: result[0] });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// DELETE owner by ID
-app.delete(
-  "/todo/owner",
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { id } = req.body;
-      if (!id) throw new Error("Missing id");
-
-      const results = await dbClient.query.ownerTable.findMany({
-        where: eq(ownerTable.id, id),
-      });
-      if (results.length === 0) throw new Error("Invalid owner id");
-
-      await dbClient.delete(ownerTable).where(eq(ownerTable.id, id));
-      res.json({ msg: `Owner deleted successfully`, data: { id } });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// DELETE all owners
-app.post(
-  "/todo/owner/all",
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await dbClient.delete(ownerTable);
-      res.json({ msg: `Deleted all owners successfully`, data: {} });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
