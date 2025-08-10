@@ -40,18 +40,14 @@ app.get("/todo", async (req, res, next) => {
 // Insert
 app.put("/todo", async (req, res, next) => {
   try {
-    const { title, profile_url, status } = req.body;
-    if (!title) throw new Error("Empty title");
-
+    const todoText = req.body.todoText ?? "";
+    if (!todoText) throw new Error("Empty todoText");
     const result = await dbClient
       .insert(todoTable)
       .values({
-        title,
-        profile_url: profile_url ?? null,
-        status: status ?? "pending",
+        todoText,
       })
-      .returning();
-
+      .returning({ id: todoTable.id, todoText: todoTable.todoText });
     res.json({ msg: `Insert successfully`, data: result[0] });
   } catch (err) {
     next(err);
@@ -61,18 +57,11 @@ app.put("/todo", async (req, res, next) => {
 // Update
 app.patch("/todo", async (req, res, next) => {
   try {
-    const { id, title, profile_url, status } = req.body;
-    if (!id) throw new Error("Empty id");
+    const id = req.body.id ?? "";
+    const todoText = req.body.todoText ?? "";
+    if (!todoText || !id) throw new Error("Empty todoText or id");
 
-    const updateData: Record<string, any> = {};
-    if (title !== undefined) updateData.title = title;
-    if (profile_url !== undefined) updateData.profile_url = profile_url;
-    if (status !== undefined) updateData.status = status;
-
-    if (Object.keys(updateData).length === 0) {
-      throw new Error("No fields to update");
-    }
-
+    // Check for existence if data
     const results = await dbClient.query.todoTable.findMany({
       where: eq(todoTable.id, id),
     });
@@ -80,11 +69,10 @@ app.patch("/todo", async (req, res, next) => {
 
     const result = await dbClient
       .update(todoTable)
-      .set(updateData)
+      .set({ todoText })
       .where(eq(todoTable.id, id))
-      .returning();
-
-    res.json({ msg: `Update successfully`, data: result[0] });
+      .returning({ id: todoTable.id, todoText: todoTable.todoText });
+    res.json({ msg: `Update successfully`, data: result });
   } catch (err) {
     next(err);
   }
@@ -137,7 +125,7 @@ const jsonErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
 app.use(jsonErrorHandler);
 
 // Running app
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3093;
 // * Running app
 app.listen(PORT, async () => {
   debug(`Listening on port ${PORT}: http://localhost:${PORT}`);
