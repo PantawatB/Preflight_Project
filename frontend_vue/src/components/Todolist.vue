@@ -90,7 +90,7 @@
       </div>
     </div>
     <!-- กล่องข้อมูลของ list -->
-    <div class="bg-gray-50 rounded-xl shadow-md overflow-hidden">
+<div class="bg-gray-50 rounded-xl shadow-md overflow-hidden">
       <!-- ส่วน header -->
       <table class="min-w-full divide-y divide-gray-300">
         <!-- สี header -->
@@ -250,7 +250,73 @@
         </div>
       </div>
 
-      <!-- Pagination removed for todo list -->
+      <!-- Pagination -->
+      <div class="px-6 py-4 bg-white border-t border-gray-200">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-500">
+            {{
+              pagination.totalItems === 0
+                ? 'No results'
+                : `Showing ${(pagination.pageSize * (pagination.currentPage - 1)) + 1}-${Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of ${pagination.totalItems} results`
+            }}
+          </div>
+          <div class="flex items-center space-x-2">
+            <button
+              @click="changePage(pagination.currentPage - 1)"
+              :disabled="pagination.currentPage === 1 || !!searchQuery || !!selectedStatus"
+              :class="[
+                'px-3 py-1 rounded-lg border',
+                (pagination.currentPage === 1 || searchQuery || selectedStatus)
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-gray-700 hover:bg-gray-50',
+              ]"
+            >
+              Previous
+            </button>
+            <div class="flex items-center gap-1">
+              <template v-if="pagination.totalPages <= 20">
+                <button
+                  v-for="page in pagination.totalPages"
+                  :key="page"
+                  @click="changePage(page)"
+                  :disabled="!!searchQuery || !!selectedStatus"
+                  :class="[
+                    'px-3 py-1 rounded-lg border',
+                    (pagination.currentPage === page && !(searchQuery || selectedStatus))
+                      ? 'bg-slate-600 text-white border-slate-600'
+                      : (searchQuery || selectedStatus)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-50',
+                  ]"
+                >
+                  {{ page }}
+                </button>
+              </template>
+              <template v-else>
+                <button
+                  disabled
+                  class="px-3 py-1 rounded-lg border bg-white text-gray-700 font-bold cursor-default"
+                  style="pointer-events: none; min-width: 48px;"
+                >
+                  {{ pagination.currentPage }}
+                </button>
+              </template>
+            </div>
+            <button
+              @click="changePage(pagination.currentPage + 1)"
+              :disabled="pagination.currentPage === pagination.totalPages || pagination.totalItems === 0 || !!searchQuery || !!selectedStatus"
+              :class="[
+                'px-3 py-1 rounded-lg border',
+                (pagination.currentPage === pagination.totalPages || pagination.totalItems === 0 || searchQuery || selectedStatus)
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-gray-700 hover:bg-gray-50',
+              ]"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Modal -->
@@ -339,10 +405,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import type { TodoItem } from '../models/web.model';
-import { getTodos, addTodo, updateTodo, deleteTodo } from '../services/web.service.ts';
+import type { TodoItem, TodoListResponse, Pagination } from '../models/web.model';
+import { addTodo, updateTodo, deleteTodo } from '../services/web.service.ts';
 
 const todos = ref<TodoItem[]>([])
+const allTodos = ref<TodoItem[] | null>(null) // เก็บข้อมูลทุกหน้าเมื่อค้นหา
+const pagination = ref<Pagination>({
+  currentPage: 1,
+  pageSize: 10,
+  totalItems: 0,
+  totalPages: 1,
+  next: null,
+  prev: null,
+});
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const isEditing = ref(false)
@@ -352,13 +427,13 @@ const newTodo = ref({ todoText: '' })
 const searchQuery = ref('')
 const showFilterMenu = ref(false)
 const selectedStatus = ref('')
-const currentPage = ref(1)
-const itemsPerPage = 10
+// currentPage, itemsPerPage ไม่ใช้แล้ว ใช้ pagination จาก API
 const showViewModal = ref(false)
 const viewTodoData = ref<TodoItem | null>(null)
 
 const filteredTodos = computed(() => {
-  return todos.value.filter((todo) => {
+  const list = allTodos.value !== null ? allTodos.value : todos.value;
+  return list.filter((todo) => {
     const matchesSearch = todo.todoText.toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesStatus =
       !selectedStatus.value ||
@@ -368,26 +443,82 @@ const filteredTodos = computed(() => {
   })
 })
 
+// ถ้า searchQuery หรือ selectedStatus มีค่า ให้แสดง filteredTodos ทั้งหมด (ทุกหน้า)
 const paginatedTodos = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage
-  const end = start + itemsPerPage
-  return filteredTodos.value.slice(start, end)
-})
+  if ((searchQuery.value || selectedStatus.value) && allTodos.value !== null) {
+    return filteredTodos.value;
+  }
+  return todos.value;
+});
 
-async function fetchTodos() {
+async function fetchTodos(page = 1) {
   try {
-    const data: TodoItem[] = await getTodos();
-    todos.value = data;
-    // ถ้าต้องการใช้ pagination ในอนาคต สามารถปรับ getTodos ให้ return TodoListResponse แล้วเก็บ pagination ได้
+    // ถ้า searchQuery หรือ selectedStatus มีค่า ให้ดึงข้อมูลทุกหน้า (all)
+    if (searchQuery.value || selectedStatus.value) {
+      let allData: TodoItem[] = [];
+      let pageNum = 1;
+      let keepFetching = true;
+      const maxPageSize = 100;
+      while (keepFetching) {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/todo?page=${pageNum}&pageSize=${maxPageSize}`);
+        if (!res.ok) throw new Error('API error');
+        const result: TodoListResponse = await res.json();
+        allData = allData.concat(result.data);
+        if (result.pagination.currentPage >= result.pagination.totalPages) {
+          keepFetching = false;
+        } else {
+          pageNum++;
+        }
+      }
+      allTodos.value = allData;
+      todos.value = allData.slice(0, pagination.value.pageSize); // fallback UI
+      // pagination.value = ... ไม่ต้องอัปเดต เพราะ search/filter จะไม่ใช้ pagination
+    } else {
+      allTodos.value = null;
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/todo?page=${page}&pageSize=${pagination.value.pageSize}`);
+      if (!res.ok) throw new Error('API error');
+      const result: TodoListResponse = await res.json();
+      todos.value = result.data;
+      pagination.value = result.pagination;
+    }
   } catch (e) {
     todos.value = [];
+    allTodos.value = null;
+    pagination.value = {
+      currentPage: 1,
+      pageSize: 10,
+      totalItems: 0,
+      totalPages: 1,
+      next: null,
+      prev: null,
+    };
   }
 }
 
+function changePage(page: number) {
+  if (page < 1 || page > pagination.value.totalPages) return;
+  if (searchQuery.value || selectedStatus.value) return; // ถ้า search หรือ filter อยู่ ไม่เปลี่ยนหน้า
+  fetchTodos(page);
+}
+
+
+
 onMounted(() => {
   window.addEventListener('click', handleClickOutside)
-  fetchTodos()
+  fetchTodos(1)
 })
+
+
+import { watch } from 'vue';
+// watch searchQuery: ถ้าเปลี่ยน ให้ fetch ข้อมูลทุกหน้าใหม่
+watch(searchQuery, () => {
+  fetchTodos(1);
+});
+// watch selectedStatus: ถ้าเปลี่ยน ให้ fetch ข้อมูลทุกหน้าใหม่ (เหมือน search)
+watch(selectedStatus, () => {
+  // ถ้าเลือก filter ใดๆ ให้ดึงข้อมูลทุกหน้า (เหมือน search)
+  fetchTodos(1);
+});
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', handleClickOutside)
@@ -419,7 +550,8 @@ const addOrUpdateTodo = async () => {
   } else {
     await addTodo(newTodo.value.todoText)
   }
-  await fetchTodos()
+  // รีเฟรชข้อมูลโดยคงหน้าเดิมไว้
+  await fetchTodos(pagination.value.currentPage);
   closeModal()
 }
 
@@ -431,7 +563,8 @@ const openDeleteModal = (todo: TodoItem) => {
 const confirmDelete = async () => {
   if (todoToDelete.value) {
     await deleteTodo(todoToDelete.value.id)
-    await fetchTodos()
+    // รีเฟรชข้อมูลโดยคงหน้าเดิมไว้
+    await fetchTodos(pagination.value.currentPage);
     showDeleteModal.value = false
     todoToDelete.value = null
   }
@@ -445,7 +578,8 @@ const cancelDelete = () => {
 const clearFilters = () => {
   selectedStatus.value = ''
   searchQuery.value = ''
-  currentPage.value = 1
+  // รีเซ็ตกลับไปหน้าแรกด้วยการ fetch หน้า 1
+  fetchTodos(1)
 }
 
 // Filter logic
@@ -470,8 +604,8 @@ const closeViewModal = () => {
 const markAsDone = async (todo: TodoItem) => {
   try {
     await updateTodo(todo.id, todo.todoText, true);
-    // รีเฟรชข้อมูลใหม่จาก API เพื่อให้สถานะตรงกับ backend
-    await fetchTodos();
+    // รีเฟรชข้อมูลใหม่จาก API โดยคงหน้าเดิมไว้
+    await fetchTodos(pagination.value.currentPage);
     showViewModal.value = false;
   } catch (e) {
     // fallback: อัปเดตสถานะใน local ถ้า API error
