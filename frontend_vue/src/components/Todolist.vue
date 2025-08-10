@@ -339,22 +339,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { getTodos, addTodo, updateTodo, deleteTodo } from '../services/web.service.ts'
+import type { TodoItem } from '../models/web.model';
+import { getTodos, addTodo, updateTodo, deleteTodo } from '../services/web.service.ts';
 
-interface Todo {
-  id: string
-  todoText: string
-  isDone: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-const todos = ref<Todo[]>([])
+const todos = ref<TodoItem[]>([])
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const isEditing = ref(false)
-const editingTodo = ref<Todo | null>(null)
-const todoToDelete = ref<Todo | null>(null)
+const editingTodo = ref<TodoItem | null>(null)
+const todoToDelete = ref<TodoItem | null>(null)
 const newTodo = ref({ todoText: '' })
 const searchQuery = ref('')
 const showFilterMenu = ref(false)
@@ -362,7 +355,7 @@ const selectedStatus = ref('')
 const currentPage = ref(1)
 const itemsPerPage = 10
 const showViewModal = ref(false)
-const viewTodoData = ref<Todo | null>(null)
+const viewTodoData = ref<TodoItem | null>(null)
 
 const filteredTodos = computed(() => {
   return todos.value.filter((todo) => {
@@ -383,10 +376,11 @@ const paginatedTodos = computed(() => {
 
 async function fetchTodos() {
   try {
-    const data = await getTodos()
-    todos.value = data
+    const data: TodoItem[] = await getTodos();
+    todos.value = data;
+    // ถ้าต้องการใช้ pagination ในอนาคต สามารถปรับ getTodos ให้ return TodoListResponse แล้วเก็บ pagination ได้
   } catch (e) {
-    todos.value = []
+    todos.value = [];
   }
 }
 
@@ -406,7 +400,7 @@ const openModal = () => {
   showModal.value = true
 }
 
-const editTodoModal = (todo: Todo) => {
+const editTodoModal = (todo: TodoItem) => {
   isEditing.value = true
   editingTodo.value = { ...todo }
   newTodo.value = { todoText: todo.todoText }
@@ -429,7 +423,7 @@ const addOrUpdateTodo = async () => {
   closeModal()
 }
 
-const openDeleteModal = (todo: Todo) => {
+const openDeleteModal = (todo: TodoItem) => {
   todoToDelete.value = todo
   showDeleteModal.value = true
 }
@@ -463,7 +457,7 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-const viewTodo = (todo: Todo) => {
+const viewTodo = (todo: TodoItem) => {
   viewTodoData.value = { ...todo }
   showViewModal.value = true
 }
@@ -473,7 +467,7 @@ const closeViewModal = () => {
   viewTodoData.value = null
 }
 
-const markAsDone = async (todo: Todo) => {
+const markAsDone = async (todo: TodoItem) => {
   // Try to send isDone in PATCH body (even if not in API spec)
   try {
     // @ts-ignore: try sending isDone, fallback if not supported
