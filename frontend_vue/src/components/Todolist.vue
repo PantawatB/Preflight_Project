@@ -468,32 +468,26 @@ const closeViewModal = () => {
 }
 
 const markAsDone = async (todo: TodoItem) => {
-  // Try to send isDone in PATCH body (even if not in API spec)
   try {
-    // @ts-ignore: try sending isDone, fallback if not supported
-    await fetch(import.meta.env.VITE_API_BASE_URL + '/todo', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: todo.id, todoText: todo.todoText, isDone: true })
-    })
+    await updateTodo(todo.id, todo.todoText, true);
+    // รีเฟรชข้อมูลใหม่จาก API เพื่อให้สถานะตรงกับ backend
+    await fetchTodos();
+    showViewModal.value = false;
   } catch (e) {
-    // fallback: just update todoText if isDone not supported
-    await updateTodo(todo.id, todo.todoText)
-  }
-  // Update the local state immediately for instant UI feedback
-  const idx = todos.value.findIndex(t => t.id === todo.id)
-  if (idx !== -1) {
-    todos.value[idx] = {
-      ...todos.value[idx],
-      isDone: true,
-      updatedAt: new Date().toISOString(),
+    // fallback: อัปเดตสถานะใน local ถ้า API error
+    const idx = todos.value.findIndex(t => t.id === todo.id);
+    if (idx !== -1) {
+      todos.value[idx] = {
+        ...todos.value[idx],
+        isDone: true,
+        updatedAt: new Date().toISOString(),
+      };
     }
-  }
-  // If in view modal, update the modal data as well
-  if (viewTodoData.value && viewTodoData.value.id === todo.id) {
-    viewTodoData.value.isDone = true
-    viewTodoData.value.updatedAt = new Date().toISOString()
-    showViewModal.value = false
+    if (viewTodoData.value && viewTodoData.value.id === todo.id) {
+      viewTodoData.value.isDone = true;
+      viewTodoData.value.updatedAt = new Date().toISOString();
+      showViewModal.value = false;
+    }
   }
 }
 </script>
