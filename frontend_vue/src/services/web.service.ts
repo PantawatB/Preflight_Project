@@ -43,10 +43,12 @@ export async function deleteTodo(id: string) {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+// ปรับให้ return เฉพาะ data array จาก response ใหม่
 export async function getTodos() {
   const res = await fetch(`${API_BASE_URL}/todo`);
   if (!res.ok) throw new Error('API error');
-  return res.json();
+  const result = await res.json();
+  return result.data; // return เฉพาะ array ของ todo
 }
 
 // สามารถเพิ่มฟังก์ชันอื่นๆ ได้ เช่น postTodo, deleteTodo เป็นต้น
